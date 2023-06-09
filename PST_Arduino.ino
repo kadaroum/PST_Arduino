@@ -9,6 +9,7 @@ hd44780_I2Cexp lcd; // declare lcd object: auto locate & auto config expander ch
 int ServoPortePin = 2;
 char message = -1;
 char mstemp = 0;
+bool verouillage = false;
 
 int PF = 98;
 int PN = 90;
@@ -49,17 +50,19 @@ const int LED_Cuisine = A9;
 
 // FAN
 
-int Motor_Pin1 = 6; // pin 2 on L293D
-int Motor_Pin2 = 7; // pin 7 on L293D
-int Enable = 4;     // pin 1 on L293D
+int Motor_Pin1 = 30; // pin 2 on L293D
+int Motor_Pin2 = 32; // pin 7 on L293D
+int Enable = 34;     // pin 1 on L293D
 
 int Motor_Pin3 = 24; // pin 2 on L293D
 int Motor_Pin4 = 26; // pin 7 on L293D
 int Enable2 = 22;    // pin 1 on L293D
 
+int LED_Radiator = 7;
+
 Servo myservo;
 Servo myservo2;
-SoftwareSerial bluetooth(10, 11); // (RX, TX) (pin Rx BT, pin Tx BT)
+SoftwareSerial bluetooth(10, 11); // (RX, TX) (pin Rx BT, pin Tx BT) (MAUVAIS PIN) ?
 
 void setup()
 {
@@ -76,13 +79,10 @@ void setup()
   myservo.detach();
   myservo2.detach();
 
-  digitalWrite(LED_Entree_red, LOW);
-  digitalWrite(LED_Entree_green, LOW);
-  digitalWrite(LED_Entree_blue, LOW);
+  randomSeed(analogRead(0));
+
 
   digitalWrite(53, LOW);
-  digitalWrite(4, LOW); /// ???
-  digitalWrite(7, LOW); /// ???
 
   ///////////////////////////////////////////////////////
 
@@ -120,9 +120,15 @@ void setup()
   lcd.clear();
   lcd.print("Temperature : ");
   lcd.setCursor(0, 1);
+
+  // TEMP BLUETOOTH
+
+  pinMode(tmpPin, INPUT);
+
+  pinMode(LED_Radiator, OUTPUT);
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////////
-//FIN SETUP
+// FIN SETUP
 
 // FONCTION IMPORTANTE
 
@@ -159,15 +165,76 @@ void LED_RGB_ENTREE(void)
 
 void PorteVerte()
 {
-  analogWrite(LED_Entree_green, 50); //POURQUOI 50 ?
+  analogWrite(LED_Entree_green, 50);
   analogWrite(LED_Entree_red, 0);
   analogWrite(LED_Entree_blue, 0);
 }
 void PorteRouge()
 {
-  analogWrite(LED_Entree_red, 50);   //POURQUOI 50 ?
+  analogWrite(LED_Entree_red, 255);
   analogWrite(LED_Entree_green, 0);
   analogWrite(LED_Entree_blue, 0);
+}
+
+void Verouillage()
+{
+  verouillage = true;
+}
+
+void MaisonHantee()
+{
+  // Effets de lumières inquiétantes
+  int duration = 3000; // Durée totale des effets (en millisecondes)
+  int RandomPos = random (0, 180);
+  int RandomPos2 = random (0,180);
+
+  // Boucle principale des effets de lumières
+  unsigned long startTime = millis();
+  while (millis() - startTime < duration)
+  {
+    // Clignotement aléatoire dans la pièce d'entrée
+    digitalWrite(LED_Entree, random(2)); // Allume ou éteint la LED de la pièce d'entrée de manière aléatoire
+
+    // Variation aléatoire d'intensité lumineuse dans le salon
+    analogWrite(LED_Salon, random(256)); // Définit une valeur de luminosité aléatoire pour la LED du salon
+
+    // Clignotement aléatoire dans la cuisine
+    digitalWrite(LED_Cuisine, random(2)); // Allume ou éteint la LED de la cuisine de manière aléatoire
+
+    // Variation aléatoire d'intensité lumineuse dans le garage
+    analogWrite(LED_Garage, random(256)); // Définit une valeur de luminosité aléatoire pour la LED du garage
+
+    myservo.attach(2);
+    myservo2.attach(3);
+
+   
+    myservo.write(RandomPos);
+    myservo2.write(RandomPos2);
+    delay (500);
+    myservo.write(RandomPos);
+    myservo2.write(RandomPos2);
+    delay (500);
+    
+
+    myservo.detach();
+    myservo2.detach();
+    digitalWrite(LED_Entree_blue, LOW);
+    digitalWrite(LED_Entree_green, LOW);
+    digitalWrite(LED_Entree_red, LOW);
+
+    delay(random(100, 500)); // Attend pendant une durée aléatoire entre 100 et 500 millisecondes
+  }
+}
+
+void Ascenseur (char message)
+{
+  int Value = (int)message;
+  int Pas = 255/50;
+  Value = (Value * Pas) - 325;
+  float output = Value;
+  Serial.println(output);
+
+  analogWrite(LED_Radiator, 180);
 }
 
 /////////////////////////////////// TEMPERATURE
@@ -175,27 +242,27 @@ void PorteRouge()
 void temper()
 {
   input = analogRead(tmpPin);
-  tempe = ((input * 5.0) / 1024) / 0.01;
+  tempe = (((input * 5.0) / 1024) / 0.01) -3 ;
+  //bluetooth.print(tempe);
+  //Serial.print(tempe);
 
   if (tempe < 23)
   {
     analogWrite(LED_Temp_blue, 255);
   }
-  else if (tempe > 23 && tempe <= 27)
+  else if (tempe < 27)
   {
-    blueTemp = map(tempe, 35, 75, 255, 0);
+    blueTemp = map(tempe, 24, 27, 255, 0);
+    redTemp = map(tempe, 24, 27, 0, 255);
     analogWrite(LED_Temp_blue, blueTemp);
-  }
-  if (tempe < 23)
-  {
-    analogWrite(LED_Temp_red, 0);
-  }
-  else if (tempe >= 27)
-  {
-    redTemp = map(tempe, 45, 90, 1, 255);
     analogWrite(LED_Temp_red, redTemp);
   }
-  else if (tempe > 29)
+  else if (tempe < 29)
+  {
+    analogWrite(LED_Temp_blue, 0);
+    analogWrite(LED_Temp_red, 255);
+  }
+  else
   {
     analogWrite(LED_Temp_red, 255);
   }
@@ -261,6 +328,7 @@ void FAN_OFF2()
   digitalWrite(Motor_Pin4, LOW);
 }
 
+
 ////////////////////////////////////////::
 
 void loop() // run over and over
@@ -269,12 +337,16 @@ void loop() // run over and over
   updateLCD();
   temper();
 
+
+
+
   ////////////////////////////////////////////////////////////
   if (bluetooth.available())
   {
     message = bluetooth.read();
     Serial.print(message);
-    bluetooth.print(tempe);
+    Serial.print("\n");
+    //bluetooth.print(tempe);
   }
 
   if (Serial.available())
@@ -283,138 +355,160 @@ void loop() // run over and over
     bluetooth.print(message);
   }
 
-  Serial.print(message);
-  Serial.print(" ");
-  Serial.print(mstemp);
-  Serial.print("\n");
-
-  if (message != mstemp)
+  if (!verouillage)
   {
-    // Porte
-    if (message == -1)
+    if (message != mstemp)
     {
-      LED_RGB_ENTREE();
-    }
-    if (message == 1)
-    {
-      servo(myservo, PB, 2);
-    }
-    if (message == 2)
-    {
-      myservo.detach();
-    }
-    if (message == 3)
-    {
-      servo(myservo, PF, 2);
-    }
+      // Porte
+      if (message == -1)
+      {
+        LED_RGB_ENTREE();
+      }
+      if (message == 1)
+      {
+        servo(myservo, PB, 2);
+      }
+      if (message == 2)
+      {
+        myservo.detach();
+      }
+      if (message == 3)
+      {
+        servo(myservo, PF, 2);
+      }
 
-    // Garage
-    if (message == 4)
-    {
-      servo(myservo2, GF, 3);
-    }
-    if (message == 5)
-    {
-      myservo2.detach();
-    }
-    if (message == 6)
-    {
-      servo(myservo2, GB, 3);
-    }
+      // Garage
+      if (message == 4)
+      {
+        servo(myservo2, GF, 3);
+      }
+      if (message == 5)
+      {
+        myservo2.detach();
+      }
+      if (message == 6)
+      {
+        servo(myservo2, GB, 3);
+      }
 
-    // PorteColor
-    if (message == 7)
-    {
-      PorteVerte();
-    }
-    if (message == 8)
-    {
-      PorteRouge();
-    }
+      // PorteColor
+      if (message == 7)
+      {
+        PorteVerte();
+      }
+      if (message == 8)
+      {
+        PorteRouge();
+      }
 
-    //LUMIERE SALON
-    if (message == 9)
-    {
-      digitalWrite(LED_Salon, HIGH);
-    }
-    if (message == 10)
-    {
-      digitalWrite(LED_Salon, LOW);
-    }
+      // LUMIERE SALON
+      if (message == 9)
+      {
+        digitalWrite(LED_Salon, HIGH);
+      }
+      if (message == 10)
+      {
+        digitalWrite(LED_Salon, LOW);
+      }
 
-    // CUISINE - PROBLEME
-    if (message == 11)
-    {
-      digitalWrite(LED_Cuisine, HIGH);
-    }
-    if (message == 12)
-    {
-      digitalWrite(LED_Cuisine, LOW);
-    }
+      // LUMIERE CUISINE
+      if (message == 11)
+      {
+        digitalWrite(LED_Cuisine, HIGH);
+      }
+      if (message == 12)
+      {
+        digitalWrite(LED_Cuisine, LOW);
+      }
 
-    if (message == 13)
-    {
-      TelevisionON();
-    }
-    if (message == 14)
-    {
-      TelevisionOFF();
-    }
+      if (message == 13)
+      {
+        TelevisionON();
+      }
+      if (message == 14)
+      {
+        TelevisionOFF();
+      }
 
-    if (message == 15)
-    {
-      CuissonON();
-    }
-    if (message == 16)
-    {
-      CuissonOFF();
-    }
+      if (message == 15)
+      {
+        CuissonON();
+      }
+      if (message == 16)
+      {
+        CuissonOFF();
+      }
 
-    //VENTILATEUR SALON
-    if (message == 17)
-    {
-      FAN_ON();
-    }
-    if (message == 18)
-    {
-      FAN_OFF();
-    }
-    
-    //VENTILATEUR CUISINE
-    if (message == 19)
-    {
-      FAN_ON2();
-    }
-    if (message == 20)
-    {
-      FAN_OFF2();
-    }
+      // VENTILATEUR SALON
+      if (message == 17)
+      {
+        FAN_ON();
+      }
+      if (message == 18)
+      {
+        FAN_OFF();
+      }
 
-    // PROBLEME
-    if (message == 21)
-    {
-      digitalWrite(LED_Garage, HIGH);
-    }
-    if (message == 22)
-    {
-      digitalWrite(LED_Garage, LOW);
-    }
+      // VENTILATEUR CUISINE
+      if (message == 19)
+      {
+        FAN_ON2();
+      }
+      if (message == 20)
+      {
+        FAN_OFF2();
+      }
 
-    if (message == 23)
-    {
-      digitalWrite(LED_Entree, HIGH);
-    }
-    if (message == 24)
-    {
-      digitalWrite(LED_Entree, LOW);
+      // LUMIERE GARAGE
+      if (message == 21)
+      {
+        digitalWrite(LED_Garage, HIGH);
+      }
+      if (message == 22)
+      {
+        digitalWrite(LED_Garage, LOW);
+      }
+
+      // LUMIERE ENTREE
+      if (message == 23)
+      {
+        digitalWrite(LED_Entree, HIGH);
+      }
+      if (message == 24)
+      {
+        digitalWrite(LED_Entree, LOW);
+      }
+
+      // MINI VENTILO
+      if (message == 25)
+      {
+        digitalWrite(52, HIGH);
+      }
+      if (message == 26)
+      {
+        digitalWrite(52, LOW);
+      }
+      
+      // MAISON HANTEE
+      if (message == 27)
+      {
+        MaisonHantee();
+      }
+      if (message == 28)
+      {
+        setup();
+      }
+
+      // ASCENSEUR
+      if (message >= 65 || message <= 115)
+      {
+        Ascenseur (message);
+      }
+      
+      
     }
   }
   mstemp = message;
-  message = 0;
+  message = 0; 
 }
-/* A FAIRE PETIT VENTILATEUR
-if(message == 9)
-{digitalWrite(52, HIGH);}
-if(message == 10)
-{digitalWrite(52, LOW);}
-*/
+

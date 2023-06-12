@@ -58,7 +58,7 @@ int Motor_Pin3 = 24; // pin 2 on L293D
 int Motor_Pin4 = 26; // pin 7 on L293D
 int Enable2 = 22;    // pin 1 on L293D
 
-int LED_Radiator = 7;
+int LED_Radiator = 6;
 
 Servo myservo;
 Servo myservo2;
@@ -229,12 +229,16 @@ void MaisonHantee()
 void Ascenseur (char message)
 {
   int Value = (int)message;
-  int Pas = 255/50;
-  Value = (Value * Pas) - 325;
+  int Pas = 305/50;
+  if(Value != 0)
+  {
+  Value = (Value * Pas) - 390;
+  
   float output = Value;
   Serial.println(output);
 
-  analogWrite(LED_Radiator, 180);
+  analogWrite(6, output);
+  }
 }
 
 /////////////////////////////////// TEMPERATURE
@@ -339,7 +343,6 @@ void loop() // run over and over
 
 
 
-
   ////////////////////////////////////////////////////////////
   if (bluetooth.available())
   {
@@ -359,6 +362,7 @@ void loop() // run over and over
   {
     if (message != mstemp)
     {
+    
       // Porte
       if (message == -1)
       {
